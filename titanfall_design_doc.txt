@@ -1,0 +1,435 @@
+# Browser-Based Titanfall Clone - Design Document
+
+## Project Overview
+
+A free-to-play, competitive arena FPS combining Quake 3 movement mechanics with Titanfall-style pilot/titan asymmetric gameplay, deployed as a WebAssembly browser game.
+
+---
+
+## Core Design Pillars
+
+1. **Accessible** - Runs in browser, no download required, works on low-end hardware
+2. **Skill-Based** - High mechanical skill ceiling through movement and aim
+3. **Asymmetric** - Pilots (fast/fragile) vs Titans (slow/powerful)
+4. **Competitive** - F2P with microtransactions (cosmetics only)
+
+---
+
+## Technology Stack
+
+### Engine: ioquake3
+**Why:**
+- Tiny footprint (~2MB total)
+- Proven WebAssembly ports exist
+- Excellent netcode (client-server prediction, lag compensation)
+- GPL v2 license allows commercial use
+- 20+ years of battle-testing
+- Code-first development (no editor bloat)
+
+**Alternatives Considered & Rejected:**
+- **Godot**: 27-33MB WebAssembly export by default, modern engine overhead
+- **Bevy**: 17-33MB WASM, Rust complexity, less mature
+- **Unity/Unreal**: Multi-GB downloads, wrong tool for "runs on toasters"
+- **GoldSrc/Xash3D**: Licensing nightmare (Half-Life SDK conflicts)
+
+### Networking
+- **WebRTC data channels** for game state (UDP-like, low latency)
+- **Optional voice chat** via WebRTC audio streams
+- **Optional video portraits** for player cams (bandwidth permitting)
+- Peer-to-peer with STUN/TURN for NAT traversal
+
+### Browser Deployment
+- WebAssembly via Emscripten
+- Target: <10MB initial download
+- Progressive loading for assets
+- WebGL for rendering
+
+---
+
+## Movement System
+
+### Pilot Movement
+
+**Base Q3 Mechanics:**
+- Strafe jumping (circle jumping for acceleration)
+- Air control
+- Bunny hopping
+- 320-500+ units per second achievable
+
+**Parkour Additions:**
+- **Wall Running**: Hold sprint near wall, maintains momentum
+- **Wall Jumping**: Tap jump on wall for perpendicular velocity boost
+- **Sliding**: Crouch while moving fast, preserves momentum
+- **Double Jump**: Optional (needs playtesting)
+
+**Design Philosophy:**
+- Q3 movement is FAST but PREDICTABLE (ballistic arcs)
+- Parkour is UNPREDICTABLE but SITUATIONAL (requires geometry)
+- This creates counterplay opportunities for titans
+
+**Movement vs Accuracy:**
+- Standing still = 100% accuracy
+- Moving = reduced accuracy (more speed = less accuracy)
+- Strafe jumping = significant accuracy penalty
+- Rewards positioning and commitment
+
+### Titan Movement
+
+**Characteristics:**
+- Significantly slower than pilots (150-200 ups base)
+- Heavy, momentum-based (can't stop instantly)
+- Dash ability (limited charges, ~3 uses before cooldown)
+- Possible sprint mode (faster but vulnerable?)
+- NO advanced movement (no jumping, wall running, etc.)
+
+**Camera & Awareness:**
+- First-person by default
+- **Drone System**: Deploy aerial drone for 3rd person view
+  - 5-10 second duration
+  - Shootable by pilots (50-100 HP)
+  - 15-20 second cooldown after destroyed/expires
+  - Counters pilot back attacks (especially LG harassment)
+
+---
+
+## Combat System
+
+### Pilot Health
+- **Low HP pool** (100-150, tuning required)
+- **Fast regenerating shields** (Halo-style)
+- Emphasis on hit-and-run tactics
+- 1-2 titan shots = death
+
+### Titan Health
+- **Large HP pool** (3000-5000, tuning required)
+- **Shield system** (separate from HP, regenerates slowly)
+- **No or minimal HP regeneration** (resource management matters)
+- Damage persists across engagements
+
+### Weapons - Pilot Arsenal
+
+**Against Pilots (standard Q3 weapons):**
+
+1. **Rocket Launcher**
+   - Projectile with travel time
+   - Splash damage
+   - High single-hit damage
+   - Self-damage from close range
+
+2. **Railgun**
+   - Hitscan
+   - High damage, one-shot or near-one-shot
+   - Long reload (~1.5-2 seconds)
+   - Limited ammo
+
+3. **Lightning Gun (LG)**
+   - Continuous beam, requires tracking
+   - High DPS
+   - Requires sustained exposure
+   - Medium range
+
+4. **Plasma Gun** (optional)
+   - Arcing projectile
+   - Bounces off walls
+   - Area denial
+
+5. **Machine Gun / Shotgun** (starter weapons)
+   - Lower skill floor options
+
+**Against Titans:**
+
+**Critical Design Problem: Railgun Balance**
+
+*Issue:* Hitscan railgun allows risk-free peek shooting. Pilot peeks for 0.1s, lands instant damage, retreats. Titan has zero counterplay.
+
+**Solution - Hybrid Approach:**
+- Railgun does 30-40% damage compared to rockets vs titans
+- **Each railgun shot creates 3-second tracer** showing pilot location to titan
+- Long reload (2+ seconds)
+- Limited ammo (forces resource management)
+- Result: Viable but RISKY precision option
+
+**Rocket Launcher vs Titans:**
+- Primary anti-titan weapon
+- Higher DPS than rail
+- Splash damage (more forgiving)
+- Projectile travel time = counterplay opportunity
+- Standard 300-500 damage per hit
+
+**Lightning Gun vs Titans:**
+- Works normally (NOT disabled)
+- Slightly reduced damage OR titan HP high enough to compensate
+- High risk: requires sustained exposure
+- Countered by titan drone awareness
+- Vulnerable to titan turning around
+- Creates tense "burn through HP before death" moments
+
+### Weapons - Titan Arsenal
+
+**Design Philosophy:**
+- Completely different from pilot weapons
+- Punish predictable pilot movement
+- Area denial and control
+- Feel powerful but fair
+
+**Weapon Types Needed:**
+1. **Hitscan Chain Gun** 
+   - Wide spread
+   - Shreds pilots in open
+   - Useless vs unpredictable wall-runners
+
+2. **Titan Rockets**
+   - Large splash radius
+   - One-shot pilots
+   - Slow projectile (telegraphed, dodge-able)
+   - Prediction-based shooting
+
+3. **Charge Beam / Laser Core**
+   - Charge-up mechanic
+   - Sweeping beam
+   - Area denial, forces evacuation
+
+4. **Cluster Missiles**
+   - AOE denial
+   - Blocks pathways
+   - Multi-stage detonation
+
+### Weapon Balance Summary
+
+| Weapon | Pilot vs Pilot | Pilot vs Titan | Notes |
+|--------|---------------|----------------|-------|
+| Rockets | High damage, splash | Primary option, reliable | Standard choice |
+| Railgun | One-shot hitscan | Precision, high-risk | Tracer marks shooter |
+| Lightning Gun | Tracking king | Viable but risky | Drone counterplay |
+| Plasma | Area control | Indirect fire option | Situational |
+
+---
+
+## Core Gameplay Loop
+
+### Match Flow
+1. Players spawn as pilots
+2. Earn titan through kills/objectives/time
+3. Call in titan (dramatic drop sequence)
+4. Pilot enters titan OR titan fights autonomously
+5. Titan death = return to pilot, rebuild meter
+
+### Pilot vs Pilot Combat
+- High-speed duels
+- Q3-style weapon mastery
+- Movement skills matter
+- Map knowledge critical
+
+### Pilot vs Titan Combat
+- Pilots use speed and unpredictability
+- Titans use prediction and area control
+- Open spaces favor titans (predictable jump arcs)
+- Dense geometry favors pilots (cover, parkour)
+
+### Titan vs Titan Combat
+- Positioning-based
+- Resource management (HP doesn't regenerate)
+- Shield management
+- Dash timing
+- Supporting pilot allies
+
+### Asymmetric Dynamics
+- **Pilots**: Fast but fragile, skill-based, high mobility
+- **Titans**: Slow but deadly, strategic, high HP
+- **Key tension**: Pilot movement is FAST but becomes PREDICTABLE during commits
+- **Counterplay**: Titans can track and lead predictable movement
+
+---
+
+## Map Design Principles
+
+### Geometry Requirements
+- **Open spaces** = Titan advantage (long sightlines, predictable jumps)
+- **Dense cover** = Pilot advantage (wall runs, hide spots)
+- **Vertical layers** = Movement skill expression
+- **Good maps have BOTH** = dynamic combat flow
+
+### Design Considerations
+- Wall-runnable surfaces clearly marked
+- Jump routes that require skill to execute
+- Titan-accessible paths (wider corridors)
+- Titan no-go zones (tight spaces pilots can flee to)
+- High ground positions for rail/rocket pilots
+
+---
+
+## Game Modes (Initial)
+
+### Free For All
+- Classic deathmatch
+- First to X kills or highest score at time
+- Titan earns accelerate score
+
+### Team Deathmatch
+- Team-based variant
+- Coordinate titan timing with team
+
+### Last Titan Standing (LTS)
+- Everyone starts in titans
+- One life
+- Last team standing wins
+
+### Attrition (Future)
+- Pilots + Titans + AI grunts
+- Multiple scoring methods
+- Closest to original Titanfall mode
+
+---
+
+## Monetization Strategy
+
+### Free to Play Model
+- All gameplay free
+- All weapons/titans free
+- No pay-to-win
+
+### Microtransactions (Cosmetics Only)
+- Pilot skins
+- Titan skins/paint jobs
+- Weapon skins
+- Emotes/taunts
+- Kill effects
+- Battle pass (cosmetic rewards)
+
+### Legal Compliance
+- ioquake3 GPL v2: Must open-source engine modifications
+- Game logic/assets can remain proprietary
+- Custom content (models, textures, sounds) = owned by us
+
+---
+
+## Development Phases
+
+### Phase 1: Core Prototype
+- Base Q3 movement working
+- Basic titans with simple weapons
+- One test map
+- Core pilot vs titan loop functional
+- **Goal**: Prove the concept is fun
+
+### Phase 2: Movement Expansion
+- Add wall running
+- Add wall jumping
+- Add sliding
+- **Goal**: Test if parkour breaks titan balance
+
+### Phase 3: Combat Depth
+- Full weapon roster
+- Titan weapon variety
+- Drone system implementation
+- **Goal**: Refined combat feel
+
+### Phase 4: Content & Polish
+- Multiple maps
+- Game modes
+- Visual polish
+- Sound design
+- **Goal**: Releasable game
+
+### Phase 5: Live Service
+- Cosmetic shop
+- Regular content updates
+- Community features
+- Competitive ladders
+- **Goal**: Sustainable F2P game
+
+---
+
+## Key Risks & Mitigations
+
+### Risk: Titan vs Pilot Balance
+- **Mitigation**: Extensive playtesting, iterate on movement speed caps
+- **Fallback**: Dial back Q3 movement if too oppressive
+
+### Risk: Railgun Dominance
+- **Mitigation**: Tracer system, damage reduction, ammo limits
+- **Fallback**: Make it clearly worse than rockets vs titans
+
+### Risk: WebAssembly Performance
+- **Mitigation**: ioquake3 is proven in browser, target 60 FPS minimum
+- **Fallback**: Graphics options, low-end mode
+
+### Risk: Player Count / Matchmaking
+- **Mitigation**: Small team sizes (6v6?), bot support
+- **Fallback**: Free-for-all modes work with low populations
+
+### Risk: Competitive Viability
+- **Mitigation**: High skill ceiling naturally creates competition
+- **Fallback**: Focus on casual fun if esports doesn't materialize
+
+---
+
+## Success Metrics
+
+### Technical
+- <10MB initial download
+- 60+ FPS on mid-range hardware (5-year-old laptops)
+- <100ms latency for most players
+- <5 second load time after download
+
+### Gameplay
+- Average match length: 10-15 minutes
+- Pilot TTK (time to kill): 1-3 seconds
+- Titan TTK: 30-60 seconds (sustained pilot fire)
+- Skill ceiling validated by community speedrunners/movement players
+
+### Business
+- 10k+ daily active users (first year)
+- 5%+ conversion to paying (cosmetics)
+- 40%+ 30-day retention
+- Positive community sentiment
+
+---
+
+## Open Questions Requiring Playtesting
+
+1. Exact movement speed caps for pilots
+2. Titan dash cooldown timing
+3. Optimal titan HP pool
+4. Railgun damage values vs titans
+5. Drone HP and visibility
+6. Should pilots survive one titan rocket? (probably not)
+7. Map size and player counts (4v4? 6v6? 8v8?)
+8. Titan earn rate (time vs kills vs objectives)
+9. Should titans be call-down only or also spawnable?
+10. Rodeo mechanics (if any)?
+
+---
+
+## Why This Could Work
+
+1. **Unique positioning**: Q3 movement + titans = unexplored design space
+2. **Browser accessibility**: No download barrier, instant play
+3. **Skill-based**: Natural competitive scene emergence
+4. **Low overhead**: Small team can maintain due to engine simplicity
+5. **Monetization clarity**: Cosmetics-only = community trust
+6. **Proven tech**: Not inventing new engine, leveraging 20 years of refinement
+
+---
+
+## Why This Could Fail
+
+1. **Balance nightmare**: Asymmetric gameplay is hard to tune
+2. **Niche appeal**: Very high skill ceiling may alienate casuals
+3. **Competition**: Titanfall 2 exists, has dedicated playerbase
+4. **Browser limitations**: May not feel as "premium" as native games
+5. **Team size**: Solo or small team = slow content pipeline
+
+---
+
+## Next Steps
+
+1. Set up ioquake3 development environment
+2. Test WebAssembly compilation pipeline
+3. Implement basic titan entity (larger player model, different movement)
+4. Create one test map (mix of open + dense geometry)
+5. Prototype the core loop: spawn as pilot → earn titan → call titan → fight
+6. Internal playtest to validate "is this fun?"
+7. Iterate based on findings
+
+**Target for Phase 1 prototype: 3-6 months**

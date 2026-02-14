@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# External repos (cloned separately)
+external/emsdk/
+external/ioq3/
+external/HumbleNet/
+external/humblenet-quake3/
+
+# Compiled output
+*.wasm
+*.data
+hello.html
+hello.js
+hello_gl.html
+hello_gl.js
+
+# OS
+.DS_Store
+
+# Logs
+*.log
