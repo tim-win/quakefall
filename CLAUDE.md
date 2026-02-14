@@ -111,6 +111,10 @@ quakefall/
 ├── hello.c                ← proof: C → browser pipeline works
 ├── hello_gl.c             ← proof: OpenGL rendering in browser works
 ├── package.json           ← Node.js deps (just `ws` for the proxy)
+├── tools/                 ← build tools and generators
+│   └── generate_city_map.py  ← procedural city map generator
+├── maps/                  ← generated .map source files and compiled .bsp
+│   └── qfcity1.map/bsp   ← first city map (4x4 block grid)
 ├── docs/                  ← architecture research & analysis
 │   ├── README.md          ← guide to all docs
 │   └── architecture/
@@ -119,6 +123,7 @@ quakefall/
 └── external/              ← cloned repos (gitignored)
     ├── emsdk/             ← Emscripten SDK
     ├── ioq3/              ← ioquake3 engine (the main engine we use)
+    ├── netradiant/        ← NetRadiant-Custom (contains q3map2 BSP compiler)
     ├── HumbleNet/         ← WebRTC library (explored, not needed)
     └── humblenet-quake3/  ← HumbleNet Q3 fork (explored, not needed)
 ```
@@ -129,13 +134,63 @@ quakefall/
 2. **Graphics pipeline**: OpenGL spinning triangle renders via WebGL ✅
 3. **Full Q3 engine in browser**: ioquake3 compiles to WASM, renders maps, runs game logic ✅
 4. **Browser↔server networking**: WebSocket proxy bridges browser client to native Q3 dedicated server, 3ms ping, bidirectional data flow ✅
+5. **Custom map pipeline**: Procedural Python → .map → q3map2 (BSP/VIS/LIGHT) → playable in browser ✅
+6. **Cross-machine multiplayer**: Two players on different machines connected to the same custom map via LAN ✅
 
-## What's Next (Not Yet Started)
+## Custom Map Pipeline
+
+### Map Generator
+`tools/generate_city_map.py` generates Q3 `.map` files procedurally. Currently creates a city layout with:
+- 4x4 grid of city blocks with buildings of varying heights (256-1024 units)
+- Wide streets (384 units, titan-friendly) between blocks
+- Open central plaza with low cover walls
+- Buildings with doors on south and east sides, interior platforms
+- Stairs for rooftop access
+- Weapon pickups, ammo, health, armor scattered throughout
+- 16 spawn points across streets and plaza
+- Sealed skybox with sun lighting (`skies/xtoxicsky_q3ctf3` shader)
+
+### Compiling Maps
+q3map2 is in `external/netradiant/squashfs-root/usr/bin/q3map2.x86_64`. Three passes:
+```bash
+Q3MAP2=external/netradiant/squashfs-root/usr/bin/q3map2.x86_64
+BASEPATH=external/ioq3/build-native/Release
+
+# 1. BSP (geometry)
+$Q3MAP2 -game quake3 -fs_basepath $BASEPATH -fs_game demoq3 -meta maps/qfcity1.map
+
+# 2. VIS (visibility culling)
+$Q3MAP2 -game quake3 -fs_basepath $BASEPATH -fs_game demoq3 -vis maps/qfcity1.map
+
+# 3. LIGHT (lightmaps — sky shader provides sun + ambient)
+$Q3MAP2 -game quake3 -fs_basepath $BASEPATH -fs_game demoq3 -light -fast -samples 2 -bounce 2 maps/qfcity1.map
+```
+
+### Deploying Maps
+Copy the compiled `.bsp` to both server and client game data:
+```bash
+cp maps/qfcity1.bsp external/ioq3/build-native/Release/demoq3/maps/  # native server
+cp maps/qfcity1.bsp external/ioq3/build/Release/demoq3/maps/          # WASM client
+```
+The WASM client also needs the BSP listed in `build/Release/ioquake3-config.json` under the `demoq3` files array. Browser must hard-refresh after config changes.
+
+### Q3 .map Brush Format (Critical Detail)
+q3map2's `PlaneFromPoints` uses `cross(p2-p0, p1-p0)` — outward-pointing normals. For an axis-aligned box from (x1,y1,z1) to (x2,y2,z2), the correct winding order is:
+- Left (x=x1, -X): `(x1,y1,z2) (x1,y1,z1) (x1,y2,z1)`
+- Right (x=x2, +X): `(x2,y2,z2) (x2,y2,z1) (x2,y1,z1)`
+- Back (y=y1, -Y): `(x2,y1,z1) (x1,y1,z1) (x1,y1,z2)`
+- Front (y=y2, +Y): `(x2,y2,z2) (x1,y2,z2) (x1,y2,z1)`
+- Bottom (z=z1, -Z): `(x1,y2,z1) (x1,y1,z1) (x2,y1,z1)`
+- Top (z=z2, +Z): `(x2,y2,z2) (x2,y1,z2) (x1,y1,z2)`
+
+Use float format (`%.3f`), tab indentation, and 3 trailing flag integers (`0 0 0`). Winding was derived by decompiling q3dm1.bsp as a reference.
+
+## What's Next
 
 1. **Game logic**: Add titan entity type (bigger bounding box, slower speed, more HP) — modify QVM game code
 2. **Parkour movement**: Wall running, wall jumping, sliding — extend `bg_pmove.c`
 3. **Titan hitboxes**: 6-10 sub-entities per titan that move together (shoot between legs, etc.) — entity parenting system
-4. **Custom maps**: BSP maps with mix of open areas (titan advantage) and dense geometry (pilot advantage)
+4. **Map iteration**: Improve city map — better textures, more vertical gameplay, narrow alleys for pilots
 5. **Weapons**: Pilot arsenal (rockets, railgun, lightning gun) + titan arsenal (chain gun, titan rockets, charge beam)
 
 ## Architecture Decisions Made

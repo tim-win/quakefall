@@ -1,11 +1,8 @@
 # Dependencies
 node_modules/
 
-# External repos (cloned separately)
-external/emsdk/
-external/ioq3/
-external/HumbleNet/
-external/humblenet-quake3/
+# External repos and tools (cloned/downloaded separately)
+external/
 
 # Compiled output
 *.wasm
@@ -14,6 +11,11 @@ hello.html
 hello.js
 hello_gl.html
 hello_gl.js
+
+# Map compilation artifacts (keep .map source and .bsp binary)
+maps/*.srf
+maps/*.lin
+maps/*.prt
 
 # OS
 .DS_Store
