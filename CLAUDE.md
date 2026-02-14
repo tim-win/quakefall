@@ -12,6 +12,10 @@ This project uses structured long-running agent sessions. **Read these before st
 - **`features.json`** — Immutable feature contract. All features start as `"failing"`. Only flip to `"passing"` after full validation. Never edit feature specs.
 - **`claude-progress.txt`** — Living state. What's done, what's in progress, blockers, next steps. **Read this at session start. Update it at session end and after every milestone.**
 
+### Validation Is YOUR Job
+
+**You do not hand features back to the user for testing.** You implement, you build, you start the server, you test, you confirm it works, you screenshot if visual, and THEN you mark it passing. The validation steps in `features.json` are instructions for YOU to execute, not acceptance criteria for the user. If you can't validate a feature yourself (e.g., requires a second human player), document exactly what you tested and what remains, and leave it as `"failing"`.
+
 ### Session Startup Checklist
 1. Read `claude-progress.txt` and recent `git log`
 2. Read `features.json` to find highest-priority incomplete feature

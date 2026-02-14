@@ -116,11 +116,13 @@ For any feature that has a visible effect (player model changes, HUD elements, m
 
 ### What "Passing" Means
 
+**The agent validates features itself. It does not hand them to the user for testing.** The validation steps in `features.json` are instructions the agent must execute — start the server, run commands, check output, take screenshots. If a feature cannot be fully validated without a human (e.g., requires a second player), the agent documents what it tested and what remains, and leaves the feature as `"failing"`.
+
 A feature can only be marked `"passing"` in `features.json` when ALL of:
 1. The code compiles without new warnings
 2. The server starts and runs without errors
-3. The feature works as described in the feature spec
-4. Visual features have screenshot evidence
+3. The agent has run the validation steps and confirmed the feature works
+4. Visual features have screenshot evidence saved to `docs/screenshots/`
 5. The change is committed with a proper message
 
 ## Context Window Hygiene
