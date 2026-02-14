@@ -1,0 +1,4 @@
+[submodule "external/ioq3"]
+	path = external/ioq3
+	url = git@github.com:tim-win/ioq3.git
+	branch = quakefall-titan

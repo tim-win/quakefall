@@ -1,8 +1,9 @@
 # Dependencies
 node_modules/
 
-# External repos and tools (cloned/downloaded separately)
-external/
+# External tools (downloaded separately, not modified)
+external/emsdk/
+external/netradiant/
 
 # Compiled output
 *.wasm
