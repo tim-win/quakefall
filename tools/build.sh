@@ -30,9 +30,11 @@ build_native() {
     echo "  Compiling..."
     cmake --build "$IOQ3_DIR/build-native" --parallel "$(nproc)" >> "$LOG_FILE" 2>&1
 
-    # Copy QVMs to demoq3
+    # Copy QVMs and .so files to demoq3
     cp "$IOQ3_DIR/build-native/Release/baseq3/vm/"*.qvm \
        "$IOQ3_DIR/build-native/Release/demoq3/vm/" 2>/dev/null || true
+    cp "$IOQ3_DIR/build-native/Release/baseq3/"*.so \
+       "$IOQ3_DIR/build-native/Release/demoq3/" 2>/dev/null || true
 
     echo "  Native build OK"
 }

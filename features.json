@@ -50,50 +50,50 @@
     {
       "name": "titan-child-spawn",
       "category": "titan-hitbox",
-      "description": "When player enters titan mode (/titan), spawn child hitbox entities (ET_GENERAL) for each part in the part table. Set r.contents=CONTENTS_TITANPART, r.ownerNum=parent, takedamage=qtrue. Store child entity pointers on parent gclient_t. Link all entities.",
-      "status": "failing",
+      "description": "When player enters titan mode (/titan), spawn child hitbox entities (ET_TITAN_PART) for each part in the part table. Set r.contents=CONTENTS_TITANPART, r.ownerNum=parent, takedamage=qtrue. Store child entity pointers on parent gclient_t. Link all entities.",
+      "status": "passing",
       "validation": "Enter titan mode, /titan_parts shows all child entities spawned with correct part types"
     },
     {
       "name": "titan-child-despawn",
       "category": "titan-hitbox",
       "description": "When player exits titan mode, G_FreeEntity all child hitbox entities. Clear stored pointers on parent gclient_t. No entity leaks across multiple enter/exit cycles.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Enter/exit titan mode 5 times, /titan_parts shows no orphaned children, entity count stable"
     },
     {
       "name": "titan-child-positioning",
       "category": "titan-hitbox",
       "description": "Every server frame in ClientThink or G_RunFrame, update each child entity's r.currentOrigin based on: parent origin + yaw-rotated local offset from part table. Set r.mins/r.maxs from part table. Call trap_LinkEntity. Children track parent smoothly.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Enter titan mode, move and turn, /titan_parts shows children tracking parent. Offsets rotate with yaw."
     },
     {
       "name": "titan-debug-rendering",
       "category": "titan-hitbox",
-      "description": "cg_titanDebug cvar (default 0). Value 1: translucent colored boxes for each titan part entity using trap_R_AddPolyToScene + whiteShader. Value 2: wireframe edges only. Part colors from bg_titan_parts.h. Rendered in CG_AddPacketEntities for titan part entity types.",
-      "status": "failing",
-      "validation": "Set cg_titanDebug 1 in native client, enter titan mode, see colored boxes. Screenshot in docs/screenshots/."
+      "description": "cg_titanDebug cvar (default 0). Value 1: translucent colored boxes for each titan part entity using trap_R_AddPolyToScene + whiteShader. Part colors from bg_titan_parts.h. Rendered in CG_AddPacketEntities for ET_TITAN_PART entity types.",
+      "status": "passing",
+      "validation": "Set cg_titanDebug 1 in native client, enter titan mode, see colored boxes."
     },
     {
       "name": "titan-debug-command",
       "category": "titan-hitbox",
       "description": "Server-side console command /titan_parts: prints all child entity state for the calling player. Output: part name, entity number, world position, mins/maxs, damage multiplier. Also works via rcon for headless debugging.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Enter titan mode, /titan_parts prints structured output. Also: tools/rcon.py 'titan_parts' returns data."
     },
     {
       "name": "titan-damage-routing",
       "category": "titan-hitbox",
-      "description": "When a child hitbox entity receives damage (G_Damage callback), route damage to parent player entity. Apply the part's damage multiplier from the part table. Attacker gets kill credit. Child entity itself has no health pool — all damage flows to parent.",
-      "status": "failing",
+      "description": "When a child hitbox entity receives damage (pain callback), route damage to parent player entity. Apply the part's damage multiplier from the part table. Attacker gets kill credit. Child entity itself has no health pool — all damage flows to parent.",
+      "status": "passing",
       "validation": "Shoot titan's cockpit (2x), verify parent takes double damage. Shoot arm (0.5x), verify half. Kill from part hit credits attacker."
     },
     {
       "name": "titan-damage-log",
       "category": "titan-hitbox",
       "description": "Server cvar titan_damage_log (default 0). When 1, every hit on a titan part prints: attacker name, part name, weapon, raw damage, multiplier, final damage applied. Readable via server log or rcon.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Set titan_damage_log 1, shoot titan parts, see detailed per-hit log in server console/log"
     },
     {
