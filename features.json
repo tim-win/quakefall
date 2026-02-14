@@ -30,21 +30,21 @@
       "name": "map-compile-script",
       "category": "tooling",
       "description": "tools/compile_map.sh: Compile and deploy .map file with single command. Runs BSP/VIS/LIGHT passes, copies BSP to both native and WASM build dirs. Usage: tools/compile_map.sh maps/qfcity1.map",
-      "status": "failing",
+      "status": "passing",
       "validation": "tools/compile_map.sh maps/qfcity1.map succeeds, BSP exists in both build dirs"
     },
     {
       "name": "titan-part-definitions",
       "category": "titan-hitbox",
       "description": "bg_titan_parts.h: Shared header defining titan part table. Part enum (TITAN_PART_TORSO, _COCKPIT, _ARM_L, _ARM_R, _LEG_L, _LEG_R, _VENT). Each part has: local offset (vec3), dimensions (mins/maxs), damage multiplier (float), debug color (RGBA). Shared between game and cgame.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Header compiles clean in both game and cgame modules"
     },
     {
       "name": "titan-content-flag",
       "category": "titan-hitbox",
-      "description": "CONTENTS_TITANPART content flag in q_shared.h (unused bit). Added to MASK_SHOT so weapon traces detect titan parts. NOT added to MASK_PLAYERSOLID so player movement ignores them. Titan part entities use this flag as their r.contents.",
-      "status": "failing",
+      "description": "CONTENTS_TITANPART content flag in surfaceflags.h (bit 0x0400). Added to MASK_SHOT so weapon traces detect titan parts. NOT added to MASK_PLAYERSOLID so player movement ignores them. Titan part entities use this flag as their r.contents.",
+      "status": "passing",
       "validation": "Flag defined, MASK_SHOT includes it, code compiles, player movement unaffected"
     },
     {

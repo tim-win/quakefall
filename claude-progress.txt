@@ -3,7 +3,7 @@
 # See docs/anthropic-long-running-agents.md for workflow details.
 
 ## Last Updated
-2026-02-14 — First agent session: framework setup
+2026-02-14 — Second agent session: titan hitbox system implementation
 
 ## What's Done (Phase 1)
 
@@ -28,39 +28,77 @@
 - qfcity1.map/bsp — first playable city map (4x4 block grid)
 - Full q3map2 compilation pipeline working (BSP/VIS/LIGHT)
 
-### Tooling (just set up this session)
-- tools/build.sh — native/wasm build wrapper
-- tools/server.sh — server start/stop/restart/status/log
-- tools/rcon.py — RCON client for headless server interaction
-- tools/compile_map.sh — map compile+deploy wrapper
+### Tooling
+- tools/build.sh — native/wasm build wrapper (validated)
+- tools/server.sh — server start/stop/restart/status/log (validated)
+- tools/rcon.py — RCON client for headless server interaction (validated)
+- tools/compile_map.sh — map compile+deploy wrapper (validated)
 - features.json — immutable feature contract
 - This file (claude-progress.txt) — living state
 
-## What's In Progress
+## What's Done (Phase 2) — Titan Hitbox System
 
-### Titan Mode Phase 2 — Multi-Entity Hitbox System
-Planning complete. Architecture decided:
-- Titan = core player entity (movement box) + N child entities (damage-only hitboxes)
-- Child entities use CONTENTS_TITANPART (weapon traces hit, movement ignores)
-- Per-part damage multipliers (cockpit 2x, back vents 3x, arms 0.5x, legs 0.3x)
-- Debug visualization via cg_titanDebug cvar (colored translucent boxes)
-- Shared part definition table in bg_titan_parts.h
+### Code Complete, Pending In-Game Validation
+All code compiles clean (native .so + QVM for both game and cgame modules).
+Server starts and runs without crashes. Needs client-side playtesting.
 
-Implementation order:
-1. ✅ Tooling scripts (build, server, rcon, map compile)
-2. 🔲 Validate tooling (build compiles, server starts, rcon connects)
-3. 🔲 bg_titan_parts.h — shared part table
-4. 🔲 CONTENTS_TITANPART flag + MASK_SHOT update
-5. 🔲 Child entity spawn/despawn on titan enter/exit
-6. 🔲 Per-frame child positioning (yaw-rotated offsets)
-7. 🔲 /titan_parts debug command (server-side)
-8. 🔲 cg_titanDebug colored box rendering (client-side)
-9. 🔲 Damage routing with multipliers
-10. 🔲 titan_damage_log cvar
+Implementation order (all complete):
+1. ✅ Tooling validated (build, server, rcon, map compile all working)
+2. ✅ bg_titan_parts.h/.c — shared part definition table (7 parts: torso, cockpit, arm_l, arm_r, leg_l, leg_r, vent)
+3. ✅ CONTENTS_TITANPART (0x0400) in surfaceflags.h + added to MASK_SHOT in bg_public.h
+4. ✅ ET_TITAN_PART entity type in bg_public.h
+5. ✅ g_titan.c — complete titan child entity system:
+   - G_SpawnTitanParts() — spawns 7 child entities on titan enter
+   - G_DespawnTitanParts() — frees all children on exit/death/disconnect
+   - G_UpdateTitanParts() — per-frame yaw-rotated positioning (called from g_active.c)
+   - TitanPartDie() — damage routing to parent with part multiplier
+   - Cmd_TitanParts_f() — debug print of all child entity state
+   - titan_damage_log cvar — verbose hit logging
+6. ✅ Collision strategy: parent titan uses CONTENTS_PLAYERCLIP (not CONTENTS_BODY) so shots pass through to TITANPART children
+7. ✅ cg_titanDebug cvar + translucent colored box rendering in cg_ents.c
+8. ✅ titan_parts console command registered in cgame (tab completion)
+9. ✅ Cleanup on death (g_combat.c:player_die) and disconnect (g_client.c:ClientDisconnect)
 
-## Next Steps (After Hitbox System)
+### Files Modified (external/ioq3 submodule)
+- NEW: code/game/bg_titan_parts.h — part type enum, struct, extern table declaration
+- NEW: code/game/bg_titan_parts.c — part table definition (shared game+cgame)
+- NEW: code/game/g_titan.c — all titan child entity logic
+- code/qcommon/surfaceflags.h — CONTENTS_TITANPART (0x0400)
+- code/game/bg_public.h — MAX_TITAN_PARTS, ET_TITAN_PART, MASK_SHOT update
+- code/game/g_local.h — gclient_s.titanParts[], gentity_s.titanPartType, function declarations
+- code/game/g_cmds.c — spawn/despawn in Cmd_Titan_f, titan_parts command dispatch
+- code/game/g_active.c — G_UpdateTitanParts call in per-frame titan block
+- code/game/g_combat.c — G_DespawnTitanParts on player death
+- code/game/g_client.c — G_DespawnTitanParts on disconnect
+- code/game/g_main.c — G_InitTitanCvars call
+- code/cgame/cg_ents.c — titan debug box rendering (CG_DrawTitanPartDebug)
+- code/cgame/cg_main.c — cg_titanDebug cvar declaration + registration
+- code/cgame/cg_local.h — cg_titanDebug extern
+- code/cgame/cg_consolecmds.c — titan_parts command for tab completion
+- cmake/basegame.cmake — bg_titan_parts.c + g_titan.c added to build
 
-### Titan Enter/Exit Flow
+## What Needs Testing
+
+### In-Game Validation Needed (connect client, enter titan mode)
+- titan-child-spawn: /titan_parts should show 7 children after /titan
+- titan-child-despawn: enter/exit 5x, no orphans
+- titan-child-positioning: children track parent, offsets rotate with yaw
+- titan-debug-rendering: cg_titanDebug 1 shows colored boxes around titan
+- titan-debug-command: /titan_parts prints structured output
+- titan-damage-routing: shots to cockpit (2x), arm (0.5x), vent (3x) apply correct multiplier
+- titan-damage-log: titan_damage_log 1 shows hit details in server log
+
+## Next Steps
+
+### Immediate: In-Game Testing
+1. Connect native client to running server
+2. /titan to enter titan mode
+3. /cg_titanDebug 1 to see hitbox visualization
+4. /titan_parts to verify children spawned
+5. Second client joins, shoots titan, check titan_damage_log output
+6. Test enter/exit cycling for entity leaks
+
+### After Validation: Titan Enter/Exit Flow
 - /calltitan — spawn titan from sky
 - /embark — enter a landed titan
 - /disembark — exit titan as pilot
@@ -73,14 +111,13 @@ Implementation order:
 
 ## Blockers / Known Issues
 - q3lcc QVM compiler corrupts titan-related bytecode — server MUST use vm_game 0
+- q3lcc also can't handle extern const properly — split bg_titan_parts into .h/.c to avoid duplicate symbol errors
 - Client QVMs (cgame, ui) compile fine, only qagame.qvm is affected
 - Duplicate ioq3ded processes cause network corruption — always check before starting
 
 ## Discoveries This Session
-- Q3 bounding boxes are always axis-aligned (AABB) — no rotated hitboxes
-- But: we can approximate rotation by repositioning AABBs based on parent yaw
-- Movement (MASK_PLAYERSOLID) and damage (MASK_SHOT) use separate content masks — key enabler for damage-only hitboxes
-- r.ownerNum on child entities prevents self-damage from own weapons
-- MAX_GENTITIES is 1024; ~5 children per titan × 16 titans = 80 entities, well within budget
-- trap_R_AddPolyToScene + whiteShader gives us colored translucent geometry for debug vis
-- Q3 RCON protocol is simple UDP — good for headless automation
+- q3lcc QVM compiler doesn't handle `extern const` properly — emits definitions in every translation unit, causing q3asm "Multiple definitions" errors. Fix: keep data tables in .c files, only include header with extern declaration in the .c files that use it
+- q3lcc is also strict about const pointer conversions — can't pass `const vec3_t` where `vec3_t` is expected. Fix: copy to local non-const vec3_t
+- CONTENTS_PLAYERCLIP is in MASK_PLAYERSOLID but NOT in MASK_SHOT — enables the collision strategy where titan parent blocks movement but passes weapon traces through to children
+- cmake needs source list changes for new .c files — add to both GAME_SOURCES and CGAME_SOURCES for shared code
+- Part count of 7 is conservative; engine can handle 15-30 per titan comfortably (MAX_GENTITIES=1024, budget ~700 free after players+map entities)
