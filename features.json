@@ -1,0 +1,128 @@
+{
+  "meta": {
+    "description": "QuakeFall feature contract. Features start as 'failing' and flip to 'passing' only after full validation. Never remove or edit feature specs — only update status.",
+    "workflow": "docs/anthropic-long-running-agents.md",
+    "progress": "claude-progress.txt"
+  },
+  "features": [
+    {
+      "name": "build-script",
+      "category": "tooling",
+      "description": "tools/build.sh: Single command compiles native server + client + QVMs, copies QVMs to demoq3, reports errors. Supports 'native', 'wasm', 'all' targets. Exit code 0 = success.",
+      "status": "passing",
+      "validation": "Run tools/build.sh, verify exit code 0, verify binaries updated"
+    },
+    {
+      "name": "server-management",
+      "category": "tooling",
+      "description": "tools/server.sh: start/stop/restart/status/log subcommands. Checks for duplicate processes before starting. Starts with correct flags (vm_game 0, demoq3, sv_pure 0). Sets rcon password for automation. Env vars QF_MAP and QF_RCON for overrides.",
+      "status": "passing",
+      "validation": "tools/server.sh start → server running. status → shows PID. stop → server dead. log → shows recent output."
+    },
+    {
+      "name": "rcon-client",
+      "category": "tooling",
+      "description": "tools/rcon.py: Send rcon commands to running ioq3ded, print response to stdout. Usage: python3 tools/rcon.py 'status'. Default password 'dev', default localhost:27960.",
+      "status": "passing",
+      "validation": "Start server with rcon enabled, run tools/rcon.py 'status', verify response printed"
+    },
+    {
+      "name": "map-compile-script",
+      "category": "tooling",
+      "description": "tools/compile_map.sh: Compile and deploy .map file with single command. Runs BSP/VIS/LIGHT passes, copies BSP to both native and WASM build dirs. Usage: tools/compile_map.sh maps/qfcity1.map",
+      "status": "failing",
+      "validation": "tools/compile_map.sh maps/qfcity1.map succeeds, BSP exists in both build dirs"
+    },
+    {
+      "name": "titan-part-definitions",
+      "category": "titan-hitbox",
+      "description": "bg_titan_parts.h: Shared header defining titan part table. Part enum (TITAN_PART_TORSO, _COCKPIT, _ARM_L, _ARM_R, _LEG_L, _LEG_R, _VENT). Each part has: local offset (vec3), dimensions (mins/maxs), damage multiplier (float), debug color (RGBA). Shared between game and cgame.",
+      "status": "failing",
+      "validation": "Header compiles clean in both game and cgame modules"
+    },
+    {
+      "name": "titan-content-flag",
+      "category": "titan-hitbox",
+      "description": "CONTENTS_TITANPART content flag in q_shared.h (unused bit). Added to MASK_SHOT so weapon traces detect titan parts. NOT added to MASK_PLAYERSOLID so player movement ignores them. Titan part entities use this flag as their r.contents.",
+      "status": "failing",
+      "validation": "Flag defined, MASK_SHOT includes it, code compiles, player movement unaffected"
+    },
+    {
+      "name": "titan-child-spawn",
+      "category": "titan-hitbox",
+      "description": "When player enters titan mode (/titan), spawn child hitbox entities (ET_GENERAL) for each part in the part table. Set r.contents=CONTENTS_TITANPART, r.ownerNum=parent, takedamage=qtrue. Store child entity pointers on parent gclient_t. Link all entities.",
+      "status": "failing",
+      "validation": "Enter titan mode, /titan_parts shows all child entities spawned with correct part types"
+    },
+    {
+      "name": "titan-child-despawn",
+      "category": "titan-hitbox",
+      "description": "When player exits titan mode, G_FreeEntity all child hitbox entities. Clear stored pointers on parent gclient_t. No entity leaks across multiple enter/exit cycles.",
+      "status": "failing",
+      "validation": "Enter/exit titan mode 5 times, /titan_parts shows no orphaned children, entity count stable"
+    },
+    {
+      "name": "titan-child-positioning",
+      "category": "titan-hitbox",
+      "description": "Every server frame in ClientThink or G_RunFrame, update each child entity's r.currentOrigin based on: parent origin + yaw-rotated local offset from part table. Set r.mins/r.maxs from part table. Call trap_LinkEntity. Children track parent smoothly.",
+      "status": "failing",
+      "validation": "Enter titan mode, move and turn, /titan_parts shows children tracking parent. Offsets rotate with yaw."
+    },
+    {
+      "name": "titan-debug-rendering",
+      "category": "titan-hitbox",
+      "description": "cg_titanDebug cvar (default 0). Value 1: translucent colored boxes for each titan part entity using trap_R_AddPolyToScene + whiteShader. Value 2: wireframe edges only. Part colors from bg_titan_parts.h. Rendered in CG_AddPacketEntities for titan part entity types.",
+      "status": "failing",
+      "validation": "Set cg_titanDebug 1 in native client, enter titan mode, see colored boxes. Screenshot in docs/screenshots/."
+    },
+    {
+      "name": "titan-debug-command",
+      "category": "titan-hitbox",
+      "description": "Server-side console command /titan_parts: prints all child entity state for the calling player. Output: part name, entity number, world position, mins/maxs, damage multiplier. Also works via rcon for headless debugging.",
+      "status": "failing",
+      "validation": "Enter titan mode, /titan_parts prints structured output. Also: tools/rcon.py 'titan_parts' returns data."
+    },
+    {
+      "name": "titan-damage-routing",
+      "category": "titan-hitbox",
+      "description": "When a child hitbox entity receives damage (G_Damage callback), route damage to parent player entity. Apply the part's damage multiplier from the part table. Attacker gets kill credit. Child entity itself has no health pool — all damage flows to parent.",
+      "status": "failing",
+      "validation": "Shoot titan's cockpit (2x), verify parent takes double damage. Shoot arm (0.5x), verify half. Kill from part hit credits attacker."
+    },
+    {
+      "name": "titan-damage-log",
+      "category": "titan-hitbox",
+      "description": "Server cvar titan_damage_log (default 0). When 1, every hit on a titan part prints: attacker name, part name, weapon, raw damage, multiplier, final damage applied. Readable via server log or rcon.",
+      "status": "failing",
+      "validation": "Set titan_damage_log 1, shoot titan parts, see detailed per-hit log in server console/log"
+    },
+    {
+      "name": "titan-entity-callin",
+      "category": "titan-enterxit",
+      "description": "Console command /calltitan: spawns a titan entity (ET_GENERAL with a visible model or debug box) that drops from sky to ground near the player. Lands after ~3 second delay. Becomes boardable once landed. One titan per player max.",
+      "status": "failing",
+      "validation": "Use /calltitan, titan entity appears and descends to ground. Visual confirmation required."
+    },
+    {
+      "name": "titan-embark",
+      "category": "titan-enterxit",
+      "description": "Player approaches landed titan, uses /embark or +use key within range. Player enters titan mode with full hitbox children. Titan world entity is consumed (freed). Player inherits titan's position.",
+      "status": "failing",
+      "validation": "Call titan, wait for landing, embark. Player gains titan mode + hitbox children. Debug rendering confirms."
+    },
+    {
+      "name": "titan-disembark",
+      "category": "titan-enterxit",
+      "description": "Player uses /disembark while in titan mode. Player ejected to side of titan as pilot with base health. Titan entity either despawns or remains as empty hull (design TBD). Child hitboxes despawned.",
+      "status": "failing",
+      "validation": "Disembark from titan. Player returns to pilot size/speed/health. No child hitbox entities remain."
+    },
+    {
+      "name": "titan-destruction",
+      "category": "titan-enterxit",
+      "description": "When titan (parent player) health reaches 0 while in titan mode: force-eject pilot, destroy titan, pilot spawns with base pilot health. Kill credit to attacker. Titan cooldown timer starts.",
+      "status": "failing",
+      "validation": "Kill a titan. Pilot ejected alive with base health. Attacker gets kill credit. Titan mode off."
+    }
+  ]
+}

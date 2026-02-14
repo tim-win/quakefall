@@ -1,0 +1,86 @@
+# QuakeFall Progress — Living State File
+# Updated by the agent at end of every session and after every major milestone.
+# See docs/anthropic-long-running-agents.md for workflow details.
+
+## Last Updated
+2026-02-14 — First agent session: framework setup
+
+## What's Done (Phase 1)
+
+### Infrastructure
+- ioquake3 engine compiles to WASM via Emscripten (browser client)
+- ioquake3 engine compiles natively (dedicated server + desktop client)
+- WebSocket↔UDP proxy (proxy.js) bridges browser clients to native server
+- IDBFS persistent storage at /q3home for browser client config
+- CD key check removed (was blocking browser users)
+- HTML template with QuakeFall defaults (demoq3, networking, websocket)
+
+### Titan Mode Phase 1
+- /titan console command toggles titan mode
+- Single enlarged bounding box (±30 width, 80 height)
+- 500 HP, 0.6x speed, no jumping, viewheight 56
+- PMF_TITAN flag shared between server and client prediction
+- Graceful animation number clamping (prevents BAD ANIMATION crashes)
+- MUST use vm_game 0 on server (q3lcc QVM compiler bug corrupts titan bytecode)
+
+### Maps
+- Procedural city generator (tools/generate_city_map.py)
+- qfcity1.map/bsp — first playable city map (4x4 block grid)
+- Full q3map2 compilation pipeline working (BSP/VIS/LIGHT)
+
+### Tooling (just set up this session)
+- tools/build.sh — native/wasm build wrapper
+- tools/server.sh — server start/stop/restart/status/log
+- tools/rcon.py — RCON client for headless server interaction
+- tools/compile_map.sh — map compile+deploy wrapper
+- features.json — immutable feature contract
+- This file (claude-progress.txt) — living state
+
+## What's In Progress
+
+### Titan Mode Phase 2 — Multi-Entity Hitbox System
+Planning complete. Architecture decided:
+- Titan = core player entity (movement box) + N child entities (damage-only hitboxes)
+- Child entities use CONTENTS_TITANPART (weapon traces hit, movement ignores)
+- Per-part damage multipliers (cockpit 2x, back vents 3x, arms 0.5x, legs 0.3x)
+- Debug visualization via cg_titanDebug cvar (colored translucent boxes)
+- Shared part definition table in bg_titan_parts.h
+
+Implementation order:
+1. ✅ Tooling scripts (build, server, rcon, map compile)
+2. 🔲 Validate tooling (build compiles, server starts, rcon connects)
+3. 🔲 bg_titan_parts.h — shared part table
+4. 🔲 CONTENTS_TITANPART flag + MASK_SHOT update
+5. 🔲 Child entity spawn/despawn on titan enter/exit
+6. 🔲 Per-frame child positioning (yaw-rotated offsets)
+7. 🔲 /titan_parts debug command (server-side)
+8. 🔲 cg_titanDebug colored box rendering (client-side)
+9. 🔲 Damage routing with multipliers
+10. 🔲 titan_damage_log cvar
+
+## Next Steps (After Hitbox System)
+
+### Titan Enter/Exit Flow
+- /calltitan — spawn titan from sky
+- /embark — enter a landed titan
+- /disembark — exit titan as pilot
+- Titan destruction — force-eject pilot on death
+
+### Future (Not Yet Scoped)
+- Parkour movement (wall run, wall jump, slide) — extends bg_pmove.c
+- Pilot weapons + titan weapons
+- Map iteration (vertical gameplay, pilot-only alleys)
+
+## Blockers / Known Issues
+- q3lcc QVM compiler corrupts titan-related bytecode — server MUST use vm_game 0
+- Client QVMs (cgame, ui) compile fine, only qagame.qvm is affected
+- Duplicate ioq3ded processes cause network corruption — always check before starting
+
+## Discoveries This Session
+- Q3 bounding boxes are always axis-aligned (AABB) — no rotated hitboxes
+- But: we can approximate rotation by repositioning AABBs based on parent yaw
+- Movement (MASK_PLAYERSOLID) and damage (MASK_SHOT) use separate content masks — key enabler for damage-only hitboxes
+- r.ownerNum on child entities prevents self-damage from own weapons
+- MAX_GENTITIES is 1024; ~5 children per titan × 16 titans = 80 entities, well within budget
+- trap_R_AddPolyToScene + whiteShader gives us colored translucent geometry for debug vis
+- Q3 RCON protocol is simple UDP — good for headless automation

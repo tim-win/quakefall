@@ -4,9 +4,30 @@
 
 QuakeFall is a browser-based arena FPS: Quake 3 movement mechanics + Titanfall-style pilot/titan asymmetric gameplay, compiled to WebAssembly and running in Chrome. Free-to-play, cosmetics-only monetization.
 
+## Agent Workflow
+
+This project uses structured long-running agent sessions. **Read these before starting work:**
+
+- **`docs/anthropic-long-running-agents.md`** — Full workflow specification (session structure, commit discipline, validation rules)
+- **`features.json`** — Immutable feature contract. All features start as `"failing"`. Only flip to `"passing"` after full validation. Never edit feature specs.
+- **`claude-progress.txt`** — Living state. What's done, what's in progress, blockers, next steps. **Read this at session start. Update it at session end and after every milestone.**
+
+### Session Startup Checklist
+1. Read `claude-progress.txt` and recent `git log`
+2. Read `features.json` to find highest-priority incomplete feature
+3. Verify build compiles cleanly (`tools/build.sh native`)
+4. Begin work on a single feature
+
+### Commit Convention
+```
+feat(titan-hitbox): add child entity spawn on titan enter
+[WIP] feat(titan-debug): rendering works but wireframe mode incomplete
+```
+Always commit submodule (`external/ioq3`) first, then parent repo.
+
 ## Tech Stack
 
-- **Engine**: ioquake3 (C, GPL v2) — open-source Quake 3 engine, tracked as a git submodule at `external/ioq3` (fork: `tim-win/ioq3`, branch: `quakefall-titan`)
+- **Engine**: ioquake3 (C, GPL v2) — git submodule at `external/ioq3` (fork: `tim-win/ioq3`, branch: `quakefall-titan`)
 - **Compiler**: Emscripten — cross-compiles C to WebAssembly
 - **Rendering**: OpenGL in C → Emscripten translates to WebGL automatically
 - **Networking**: Emscripten POSIX socket emulation (UDP→WebSocket) + Node.js WebSocket↔UDP proxy (`proxy.js`)
@@ -18,56 +39,103 @@ QuakeFall is a browser-based arena FPS: Quake 3 movement mechanics + Titanfall-s
 
 ```
 quakefall/
-├── CLAUDE.md              ← you are here
-├── titanfall_design_doc.txt  ← full game design (movement, weapons, titans, modes)
-├── proxy.js               ← WebSocket↔UDP relay (30 lines)
-├── package.json           ← Node.js deps (just `ws`)
+├── CLAUDE.md                 ← project constitution (static)
+├── claude-progress.txt       ← living state (updated by agents)
+├── features.json             ← feature contract (immutable specs, mutable status)
+├── titanfall_design_doc.txt  ← full game design doc
+├── proxy.js                  ← WebSocket↔UDP relay
+├── package.json              ← Node.js deps (just `ws`)
 ├── tools/
+│   ├── build.sh              ← compile native/wasm (tools/build.sh native)
+│   ├── server.sh             ← server management (tools/server.sh start|stop|restart|status|log)
+│   ├── rcon.py               ← RCON client (python3 tools/rcon.py 'status')
+│   ├── compile_map.sh        ← map compile+deploy (tools/compile_map.sh maps/foo.map)
 │   └── generate_city_map.py  ← procedural city map generator
 ├── maps/
-│   └── qfcity1.map/bsp   ← first city map (4x4 block grid)
+│   └── qfcity1.map/bsp      ← first city map
 ├── docs/
-│   ├── explored-alternatives.md  ← engines/networking approaches we evaluated
-│   └── architecture/             ← research from architecture phase
+│   ├── anthropic-long-running-agents.md  ← agent workflow spec
+│   ├── explored-alternatives.md
+│   └── architecture/
 ├── external/
-│   ├── ioq3/              ← ioquake3 engine (git submodule, modified)
-│   ├── emsdk/             ← Emscripten SDK (gitignored, download separately)
-│   └── netradiant/        ← NetRadiant-Custom for q3map2 (gitignored, download separately)
-├── hello.c                ← proof-of-concept: C → browser
-└── hello_gl.c             ← proof-of-concept: OpenGL → WebGL
+│   ├── ioq3/                 ← ioquake3 engine (git submodule, modified)
+│   ├── emsdk/                ← Emscripten SDK (gitignored)
+│   └── netradiant/           ← NetRadiant-Custom for q3map2 (gitignored)
+└── hello.c / hello_gl.c     ← proof-of-concept files
 ```
 
-## How The Build Works
+## Tooling Quick Reference
+
+```bash
+# Build
+tools/build.sh native          # Compile native server + client (~30s)
+tools/build.sh wasm            # Compile WASM browser client
+tools/build.sh all             # Both
+
+# Server management
+tools/server.sh start          # Start ioq3ded (checks for duplicates, sets rcon)
+tools/server.sh stop           # Kill server
+tools/server.sh restart        # Stop + start
+tools/server.sh status         # Check if running
+tools/server.sh log            # Tail server log
+tools/server.sh log 100        # Tail last 100 lines
+
+# RCON (server must be running)
+python3 tools/rcon.py status              # Player list
+python3 tools/rcon.py "map qfcity1"       # Change map
+python3 tools/rcon.py "titan_parts"       # Dump titan hitbox state (when implemented)
+
+# Map compilation
+tools/compile_map.sh maps/qfcity1.map    # BSP/VIS/LIGHT + deploy to both build dirs
+
+# Environment overrides
+QF_MAP=testmap tools/server.sh start     # Start with different map
+QF_RCON=secret tools/server.sh start     # Different rcon password
+```
+
+## Building From Scratch
 
 ### Prerequisites
 ```bash
-# Emscripten SDK (one-time setup)
+# Emscripten SDK (one-time, for WASM builds only)
 git clone https://github.com/emscripten-core/emsdk external/emsdk
 cd external/emsdk && ./emsdk install latest && ./emsdk activate latest
 source external/emsdk/emsdk_env.sh
 ```
 
-### Building ioquake3 for Browser (WASM)
+### Native Build (Primary Development Path)
 ```bash
-cd external/ioq3
-emcmake cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel 8
-cp build/Release/baseq3/vm/*.qvm build/Release/demoq3/vm/
+tools/build.sh native
 ```
-Output: `external/ioq3/build/Release/` (ioquake3.html, .js, .wasm, config)
+Output: `external/ioq3/build-native/Release/` (ioq3ded, ioquake3, .so files)
+
+### WASM Build (Browser Client)
+```bash
+tools/build.sh wasm
+```
+Output: `external/ioq3/build/Release/` (ioquake3.html, .js, .wasm)
 
 **Important**: Rebuilds regenerate `ioquake3.html` and `ioquake3-config.json` from source templates. Always edit `code/web/client.html.in` and `code/web/client-config.json`, not the build output.
 
-### Building Native Dedicated Server
-```bash
-cd external/ioq3
-cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Release -DBUILD_SERVER=ON
-cmake --build build-native --parallel 8
-cp build-native/Release/baseq3/vm/*.qvm build-native/Release/demoq3/vm/
-```
-
 ### Game Assets
 The Q3 demo pak (`pak0.pk3`, 45MB) must be in `<build-dir>/demoq3/`. Extracted from the freely-distributable Q3 Linux demo installer.
+
+## Running Multiplayer Locally
+
+```bash
+# Terminal 1: Dedicated server (tools handle all the flags)
+tools/server.sh start
+
+# Terminal 2: WebSocket proxy (for browser clients)
+node proxy.js
+
+# Terminal 3: HTTP server (for browser clients)
+python3 -m http.server 8080 --bind 0.0.0.0 --directory external/ioq3/build/Release
+
+# Native client: run external/ioq3/build-native/Release/ioquake3 directly
+# Browser client: open http://<hostname>:8080/ioquake3.html
+# Connect: open console (~), type /connect <server-ip>
+```
 
 ## Engine Modifications
 
@@ -79,7 +147,7 @@ All modifications live in the `external/ioq3` submodule on the `quakefall-titan`
 - **CD key removal** (`code/q3_ui/ui_menu.c`): Removed unconditionally (was blocking browser users)
 - **Game data config** (`code/web/client-config.json`): Custom maps listed for WASM client loading
 
-### Titan Mode (Phase 1)
+### Titan Mode (Phase 1 — Single Bounding Box)
 Console command `/titan` toggles titan mode. Files modified:
 - `bg_public.h` — `PMF_TITAN` flag (32768) + dimension constants
 - `bg_pmove.c` — Titan bbox in `PM_CheckDuck()`, jump disabled in `PM_CheckJump()`
@@ -92,23 +160,6 @@ Console command `/titan` toggles titan mode. Files modified:
 
 Parameters: 500 HP, ±30 width, 80 height, viewheight 56, 0.6x speed, no jumping.
 
-## Running Multiplayer Locally
-
-```bash
-# Terminal 1: Q3 dedicated server (MUST use vm_game 0)
-cd external/ioq3/build-native/Release
-DISPLAY= ./ioq3ded +set com_basegame demoq3 +set sv_pure 0 +set dedicated 1 +set vm_game 0 +map qfcity1
-
-# Terminal 2: WebSocket proxy
-node proxy.js
-
-# Terminal 3: HTTP server for browser client
-python3 -m http.server 8080 --bind 0.0.0.0 --directory external/ioq3/build/Release
-
-# Browser: open http://<hostname>:8080/ioquake3.html
-# Open console (~), type: /connect <server-ip>
-```
-
 ## Custom Map Pipeline
 
 ### Generator
@@ -116,15 +167,7 @@ python3 -m http.server 8080 --bind 0.0.0.0 --directory external/ioq3/build/Relea
 
 ### Compile & Deploy
 ```bash
-Q3MAP2=external/netradiant/squashfs-root/usr/bin/q3map2.x86_64
-BASEPATH=external/ioq3/build-native/Release
-
-$Q3MAP2 -game quake3 -fs_basepath $BASEPATH -fs_game demoq3 -meta maps/qfcity1.map
-$Q3MAP2 -game quake3 -fs_basepath $BASEPATH -fs_game demoq3 -vis maps/qfcity1.map
-$Q3MAP2 -game quake3 -fs_basepath $BASEPATH -fs_game demoq3 -light -fast -samples 2 -bounce 2 maps/qfcity1.map
-
-cp maps/qfcity1.bsp external/ioq3/build-native/Release/demoq3/maps/
-cp maps/qfcity1.bsp external/ioq3/build/Release/demoq3/maps/
+tools/compile_map.sh maps/qfcity1.map
 ```
 WASM client also needs the BSP listed in `code/web/client-config.json`.
 
@@ -137,20 +180,12 @@ q3map2 `PlaneFromPoints` uses `cross(p2-p0, p1-p0)` — outward normals. For box
 - Bottom (-Z): `(x1,y2,z1) (x1,y1,z1) (x2,y1,z1)`
 - Top (+Z): `(x2,y2,z2) (x2,y1,z2) (x1,y1,z2)`
 
-## What's Next
-
-1. **Titan mode Phase 2**: Entity-based enter/exit flow (call down a titan, climb in/out)
-2. **Parkour movement**: Wall running, wall jumping, sliding — extend `bg_pmove.c`
-3. **Titan hitboxes**: Multi-entity system (shoot between legs, target weak points)
-4. **Map iteration**: Better textures, more vertical gameplay, narrow pilot alleys
-5. **Weapons**: Pilot arsenal + titan arsenal
-
 ## Known Quirks
 
-- **Server MUST use `+set vm_game 0`**: q3lcc QVM compiler generates corrupted bytecode for titan code, causing multiplayer BAD ANIMATION crashes. Native .so works correctly. Client QVMs (cgame, ui) are fine.
-- **Always check for duplicate servers**: `ps aux | grep ioq3ded` before starting — duplicates on port 27960 cause network corruption.
+- **Server MUST use `+set vm_game 0`**: q3lcc QVM compiler generates corrupted bytecode for titan code, causing multiplayer BAD ANIMATION crashes. Native .so works correctly. Client QVMs (cgame, ui) are fine. `tools/server.sh` handles this automatically.
+- **Always check for duplicate servers**: `tools/server.sh` checks for this, but if running manually: `ps aux | grep ioq3ded` — duplicates on port 27960 cause network corruption.
 - **QVM code != Emscripten code**: QVM files (game/, cgame/, q3_ui/) are compiled by q3lcc, not emcc. `#ifdef __EMSCRIPTEN__` does not work in QVM code.
 - **Edit source templates, not build output**: Rebuilds regenerate HTML and config JSON from `code/web/` sources.
-- **Suppress GTK dialog**: Use `DISPLAY=` when running headless dedicated server.
+- **Suppress GTK dialog**: Use `DISPLAY=` when running headless dedicated server. `tools/server.sh` handles this.
 - **IDBFS in Emscripten 5.x**: Use `module.FS.filesystems.IDBFS`, not `module.IDBFS`.
 - **Console commands need `/` prefix**: ioquake3 `con_autochat` sends bare text as chat.
