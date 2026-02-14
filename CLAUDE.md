@@ -99,7 +99,7 @@ recvfrom() in C  ←    WebSocket←UDP    ←    normal UDP packets
 ```bash
 # Terminal 1: Q3 dedicated server
 cd external/ioq3/build-native/Release
-DISPLAY= ./ioq3ded +set com_basegame demoq3 +set sv_pure 0 +set dedicated 1 +map qfcity1
+DISPLAY= ./ioq3ded +set com_basegame demoq3 +set sv_pure 0 +set dedicated 1 +set vm_game 0 +map qfcity1
 
 # Terminal 2: WebSocket proxy
 node proxy.js
@@ -203,7 +203,7 @@ Use float format (`%.3f`), tab indentation, and 3 trailing flag integers (`0 0 0
 
 ## What's Next
 
-1. **Titan mode**: Player transformation — bigger bounding box, slower speed, more HP, restricted movement. Console command first, then entity-based enter/exit flow.
+1. **Titan mode (Phase 1 done)**: Player transformation implemented — `/titan` console command toggles titan mode (bigger bounding box, slower speed, 500HP, no jumping). Next: entity-based enter/exit flow.
 2. **Parkour movement**: Wall running, wall jumping, sliding — extend `bg_pmove.c`
 3. **Titan hitboxes**: 6-10 sub-entities per titan that move together (shoot between legs, etc.) — entity parenting system
 4. **Map iteration**: Improve city map — better textures, more vertical gameplay, narrow alleys for pilots
@@ -232,4 +232,5 @@ Use float format (`%.3f`), tab indentation, and 3 trailing flag integers (`0 0 0
 - Rebuilds regenerate HTML and config JSON from templates. Always edit source files in `code/web/`, not build output.
 - QVM code (game/, cgame/, q3_ui/) is compiled by q3lcc, NOT Emscripten. `#ifdef __EMSCRIPTEN__` does not work there.
 - Two Q3 server processes can accidentally spawn if you're not careful with backgrounding. Check with `ps aux | grep ioq3ded`.
+- **Server MUST use vm_game 0 (native .so)**: The q3lcc QVM compiler generates corrupted bytecode for the titan game code, causing BAD ANIMATION errors when multiple clients connect. The native .so (compiled by gcc) works correctly. Always start the server with `+set vm_game 0`. This only affects qagame (server-side); client QVMs (cgame, ui) work fine.
 - IDBFS access in Emscripten 5.x: use `module.FS.filesystems.IDBFS`, not `module.IDBFS`.
