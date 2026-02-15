@@ -3,7 +3,7 @@
 # See docs/anthropic-long-running-agents.md for workflow details.
 
 ## Last Updated
-2026-02-15 — Session 4: titan-animation features (crouch compression + walk animation)
+2026-02-15 — Session 5: titan enter/exit flow (calltitan, embark, disembark, destruction)
 
 ## What's Done (Phase 1)
 
@@ -134,13 +134,61 @@ Both titan-animation features validated in-game with native client.
 - code/game/g_svcmds.c — Enhanced titan_parts server command with crouchFrac/walkPhase output
 - code/cgame/cg_ents.c — Updated CG_DrawTitanPartDebug for crouch-compressed debug boxes
 
-## Next Steps
+## What's Done (Session 5) — Titan Enter/Exit Flow (ALL VALIDATED)
 
-### Immediate: Titan Enter/Exit Flow (Phase 3)
-- /calltitan — spawn titan from sky
-- /embark — enter a landed titan
-- /disembark — exit titan as pilot
-- Titan destruction — force-eject pilot on death
+All 4 titan enter/exit features validated in-game with native client.
+
+### Calltitan (titan-entity-callin)
+- `/calltitan` spawns ET_GENERAL pod entity 2000 units above player
+- Pod descends at 400 u/s via TR_LINEAR trajectory
+- TitanPodThink traces from prev→current position each frame for ground detection
+- On landing: snaps to ground, becomes CONTENTS_SOLID, stops thinking
+- Validates: alive, not titan, no active pod, cooldown expired
+- Pod cleanup on ClientDisconnect
+
+### Embark (titan-embark)
+- `/embark` teleports player to landed pod, frees pod, enters titan mode
+- Validates: alive, not titan, has pod, pod landed (TR_STATIONARY), within 128 range
+- Uses new G_EnterTitanMode helper (sets health, spawns parts, notifies)
+
+### Disembark (titan-disembark)
+- `/disembark` finds safe eject position and exits titan mode
+- G_FindEjectPosition tries 4 cardinal directions (yaw-relative), then up, then fallback
+- Sets pilot health to 100 after exit
+- Uses new G_ExitTitanMode helper (despawns parts, restores normal state)
+
+### Titan Destruction (titan-destruction)
+- When titan health reaches 0, player_die calls G_TitanDestroyed instead of normal death
+- Awards kill credit (AddScore) and broadcasts obituary
+- Ejects pilot alive with 100 HP at safe position
+- Starts 30s cooldown (titanCooldownTime) preventing calltitan
+- The `return` in player_die prevents normal death processing (no body, no respawn timer)
+
+### Refactored Helpers
+- G_EnterTitanMode: extracted from Cmd_Titan_f, reused by embark
+- G_ExitTitanMode: extracted from Cmd_Titan_f, reused by disembark and destruction
+- Cmd_Titan_f (debug /titan) now delegates to these helpers
+
+### RCON Test Commands
+- forcecalltitan <client>, forceembark <client>, forcedisembark <client>
+- Debug output in forceembark shows pod/player positions and distance
+
+### Pod Debug Rendering
+- cg_titanDebug shows white translucent box for pod entities (ET_GENERAL + TITAN_POD_TAG)
+- Pod position interpolated from trajectory for smooth rendering during descent
+
+### Files Modified (external/ioq3 submodule)
+- code/game/g_titan.c — G_EnterTitanMode, G_ExitTitanMode, G_FindEjectPosition, G_TitanDestroyed, TitanPodThink, Cmd_CallTitan_f, Cmd_Embark_f, Cmd_Disembark_f
+- code/game/g_local.h — titanPod, titanCooldownTime fields + new function declarations
+- code/game/bg_public.h — Pod constants (speed, height, range, cooldown, tag, pilot health)
+- code/game/g_cmds.c — Refactored Cmd_Titan_f, dispatch calltitan/embark/disembark
+- code/game/g_combat.c — player_die calls G_TitanDestroyed + return (prevents normal death)
+- code/game/g_client.c — Pod cleanup on disconnect
+- code/game/g_svcmds.c — forcecalltitan, forceembark, forcedisembark RCON commands
+- code/cgame/cg_consolecmds.c — trap_AddCommand for calltitan/embark/disembark
+- code/cgame/cg_ents.c — CG_DrawTitanPodDebug for pod debug rendering
+
+## Next Steps
 
 ### Future (Not Yet Scoped)
 - Parkour movement (wall run, wall jump, slide) — extends bg_pmove.c
