@@ -1,0 +1,76 @@
+NAME parkour_debug
+DESC Parkour mechanics validation with debug output
+MAP parkour1
+
+# Enable parkour debug on server
+RCON pm_parkourDebug 1
+WAIT 2
+
+VIEW first
+WAIT 2
+NOTE Player spawned — parkour debug enabled
+
+# Test 1: DOUBLE JUMP
+# Jump from ground, release, jump again in air
+CONSOLE +moveup
+WAIT 0.4
+CONSOLE -moveup
+WAIT 0.3
+CONSOLE +moveup
+WAIT 0.4
+CONSOLE -moveup
+WAIT 2
+NOTE Test 1: Double jump — check server log for PARKOUR: Double JUMP
+
+# Test 2: CROUCH SLIDE
+# Build up speed by running, then crouch
+CONSOLE +forward
+WAIT 3
+CONSOLE +movedown
+WAIT 1.5
+CONSOLE -movedown
+CONSOLE -forward
+WAIT 1
+NOTE Test 2: Crouch slide — should maintain speed while ducked and fast
+
+# Test 3: WALL RUN
+# Use noclip to position near wall run straightaway section
+# Section 1 walls are at x=-256 (left) and x=256 (right), y=512 to y=1280
+RCON noclip 0
+WAIT 0.5
+# Move to section 1 entry (near right wall)
+CONSOLE setviewpos 230 600 32 90
+WAIT 1
+RCON noclip 0
+WAIT 0.5
+
+# Run forward and jump near right wall
+CONSOLE +forward
+WAIT 0.5
+CONSOLE +moveup
+WAIT 0.3
+CONSOLE -moveup
+WAIT 2
+CONSOLE -forward
+WAIT 1
+NOTE Test 3: Wall run — check server log for PARKOUR: Wall run START
+
+# Test 4: VAULT
+# Position near vault course section (section 7)
+# Obstacles at y positions around 4600-5200, height 40 units
+RCON noclip 0
+WAIT 0.5
+CONSOLE setviewpos 0 4800 32 90
+WAIT 1
+RCON noclip 0
+WAIT 0.5
+
+CONSOLE +forward
+WAIT 2
+CONSOLE -forward
+WAIT 1
+NOTE Test 4: Vault — check server log for PARKOUR: VAULT
+
+VIEW third
+WAIT 2
+NOTE Parkour debug test complete — check server log for all events

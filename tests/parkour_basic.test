@@ -1,0 +1,59 @@
+NAME parkour_basic
+DESC Basic parkour movement validation — double jump, wall run, slide
+MAP parkour1
+
+# Start in first person
+VIEW first
+WAIT 3
+NOTE Player spawned in parkour1 map
+
+# Walk forward to get a feel for the spawn area
+CONSOLE +forward
+WAIT 2
+CONSOLE -forward
+NOTE Walked forward in spawn area
+
+# Test double jump: jump and then jump again in air
+CONSOLE +moveup
+WAIT 0.3
+CONSOLE -moveup
+WAIT 0.2
+CONSOLE +moveup
+WAIT 0.3
+CONSOLE -moveup
+WAIT 2
+NOTE Double jump attempted — should have gotten extra height
+
+# Switch to third person to see movement
+VIEW third
+WAIT 1
+
+# Move forward and try running along the left wall
+CONSOLE +forward
+CONSOLE +moveleft
+WAIT 0.5
+CONSOLE -moveleft
+WAIT 1
+
+# Try a jump near a wall for wall run
+CONSOLE +moveup
+WAIT 0.3
+CONSOLE -moveup
+WAIT 2
+CONSOLE -forward
+NOTE Wall run attempt near wall — checking if player attaches
+
+# Test crouch slide: run fast then crouch
+CONSOLE +forward
+WAIT 2
+CONSOLE +movedown
+WAIT 1
+CONSOLE -movedown
+CONSOLE -forward
+WAIT 1
+NOTE Crouch slide attempted — should maintain speed while ducked
+
+# First person view for final check
+VIEW first
+WAIT 2
+NOTE Parkour basic test complete

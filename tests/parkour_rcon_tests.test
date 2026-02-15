@@ -1,0 +1,45 @@
+NAME parkour_rcon_tests
+DESC Server-side parkour test sequencer — all 6 mechanics via RCON
+MAP parkour1
+
+# Enable debug output
+RCON pm_parkourDebug 1
+WAIT 2
+
+VIEW first
+WAIT 1
+NOTE Starting RCON parkour test sequence
+
+# Test 1: Double Jump
+RCON test_parkour doublejump 0
+WAIT 4
+NOTE Double jump test complete
+
+# Test 2: Wall Run
+RCON test_parkour wallrun 0
+WAIT 4
+NOTE Wall run test complete
+
+# Test 3: Wall Jump
+RCON test_parkour walljump 0
+WAIT 4
+NOTE Wall jump test complete
+
+# Test 4: Crouch Slide
+RCON test_parkour slide 0
+WAIT 3
+NOTE Slide test complete
+
+# Test 5: Vault
+RCON test_parkour vault 0
+WAIT 3
+NOTE Vault test complete
+
+# Test 6: Ledge Grab
+RCON test_parkour ledgegrab 0
+WAIT 3
+NOTE Ledge grab test complete
+
+VIEW third
+WAIT 2
+NOTE All 6 parkour RCON tests complete — check server log for results
