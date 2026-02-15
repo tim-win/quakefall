@@ -100,14 +100,14 @@
       "name": "titan-crouch",
       "category": "titan-animation",
       "description": "Titan crouching adjusts the hitbox golem. When the titan player crouches, all hitbox part offsets and dimensions compress vertically to match TITAN_CROUCH_HEIGHT. Parts shift down and shrink proportionally — the golem visibly squats. Server-side (affects collision) and client-side (debug rendering updates). Crouch/stand transitions should be smooth, not instant.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Enter titan mode, crouch. cg_titanDebug shows golem compressed. Shoot crouched titan — hits register at correct new positions. Stand back up — golem returns to full height."
     },
     {
       "name": "titan-walk-animation",
       "category": "titan-animation",
       "description": "Basic procedural walking animation on the hitbox golem. When the titan moves, legs swing forward/back alternately and arms counter-swing. Offsets and sizes of leg and arm parts oscillate based on movement speed and a simple sin/cos cycle synced to server time. Stationary titan returns to idle pose. Server-side part positions update so animated hitboxes affect actual shot collision.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Enter titan mode, walk around with cg_titanDebug 1. Legs and arms visibly swing. Stop moving — golem returns to idle. Shoot a moving titan's swinging leg — hit registers on leg part with correct multiplier."
     },
     {

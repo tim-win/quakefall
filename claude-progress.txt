@@ -3,7 +3,7 @@
 # See docs/anthropic-long-running-agents.md for workflow details.
 
 ## Last Updated
-2026-02-14 — Third session: titan gameplay tuning, rendering/network bug fixes
+2026-02-15 — Session 4: titan-animation features (crouch compression + walk animation)
 
 ## What's Done (Phase 1)
 
@@ -107,6 +107,32 @@ that prevented the hitbox debug visualization from working in browser multiplaye
   (camera was inside them). Uses otherEntityNum for ownership identification.
 - **SVF_BROADCAST**: Titan part entities now broadcast to all clients regardless
   of PVS, ensuring reliable hitbox visibility in multiplayer
+
+## What's Done (Session 4) — Titan Animation (VALIDATED)
+
+Both titan-animation features validated in-game with native client.
+
+### Crouch Compression (titan-crouch)
+- Titan crouching compresses all hitbox parts vertically (Z-axis) proportionally
+- Crouch scale: 62.7% of standing height (TITAN_CROUCH_HEIGHT / TITAN_HEIGHT)
+- Smooth lerp transition (TITAN_CROUCH_RATE = 8.0, ~125ms full transition)
+- Communicated to client via es->frame (0-100 integer) for debug rendering sync
+- Server-side collision boxes updated correctly (r.mins/r.maxs scaled)
+- Validated: crouchFrac=1.00 → Z positions compressed, bboxes scaled, frame=100
+
+### Walk Animation (titan-walk-animation)
+- Procedural leg/arm swinging during movement (sin oscillation)
+- Legs swing forward/back alternately, arms counter-swing (natural gait)
+- Phase accumulates proportionally to horizontal speed
+- Amplitude normalized by run speed (320 units/s), clamped to [0,1]
+- Returns to idle pose when stationary (zero amplitude)
+- Walk parameters: leg amp=40, arm amp=25, phase rate=0.008
+
+### Files Modified (external/ioq3 submodule)
+- code/game/g_local.h — Added titanCrouchFrac and titanWalkPhase fields
+- code/game/g_titan.c — Rewrote G_UpdateTitanParts with crouch scaling + walk animation
+- code/game/g_svcmds.c — Enhanced titan_parts server command with crouchFrac/walkPhase output
+- code/cgame/cg_ents.c — Updated CG_DrawTitanPartDebug for crouch-compressed debug boxes
 
 ## Next Steps
 
