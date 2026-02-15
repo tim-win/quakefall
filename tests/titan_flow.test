@@ -1,0 +1,61 @@
+# tests/titan_flow.test
+# Full titan lifecycle: calltitan, embark, disembark, destruction, cooldown
+# Tests in BOTH first person and third person views
+NAME titan_flow
+DESC Full titan lifecycle: calltitan → embark → disembark → destruction → cooldown
+
+# --- First Person View ---
+VIEW first
+
+# Pod drop and embark
+RCON forcecalltitan 0
+WAIT 6
+NOTE [1st person] Pod should have landed near player
+RCON forceembark 0
+WAIT 2
+NOTE [1st person] Player should be in titan mode with hitbox parts
+
+# Titan debug visualization
+CVAR cg_titanDebug 1
+WAIT 3
+NOTE [1st person] Debug boxes should be visible around titan
+
+# Disembark
+RCON forcedisembark 0
+WAIT 2
+NOTE [1st person] Player ejected as pilot with 100 HP
+CVAR cg_titanDebug 0
+WAIT 1
+
+# --- Third Person View ---
+VIEW third
+CVAR cg_thirdPersonRange 120
+WAIT 1
+
+# Second lifecycle in third person
+RCON forcecalltitan 0
+WAIT 6
+NOTE [3rd person] Pod landing visible
+RCON forceembark 0
+WAIT 2
+NOTE [3rd person] Titan model visible from behind
+
+# Debug in third person
+CVAR cg_titanDebug 1
+WAIT 3
+NOTE [3rd person] Debug hitbox boxes visible around titan model
+
+# Destroy titan
+RCON test_titan_damage 0 0 600
+WAIT 2
+NOTE [3rd person] Titan destroyed, pilot ejected alive
+CVAR cg_titanDebug 0
+
+# Back to first person for cooldown check
+VIEW first
+WAIT 1
+
+# Verify cooldown blocks calltitan
+RCON forcecalltitan 0
+WAIT 1
+NOTE Calltitan should be refused (30s cooldown)

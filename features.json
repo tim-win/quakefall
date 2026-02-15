@@ -114,28 +114,28 @@
       "name": "titan-entity-callin",
       "category": "titan-enterxit",
       "description": "Console command /calltitan: spawns a titan entity (ET_GENERAL with a visible model or debug box) that drops from sky to ground near the player. Lands after ~3 second delay. Becomes boardable once landed. One titan per player max.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Use /calltitan, titan entity appears and descends to ground. Visual confirmation required."
     },
     {
       "name": "titan-embark",
       "category": "titan-enterxit",
       "description": "Player approaches landed titan, uses /embark or +use key within range. Player enters titan mode with full hitbox children. Titan world entity is consumed (freed). Player inherits titan's position.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Call titan, wait for landing, embark. Player gains titan mode + hitbox children. Debug rendering confirms."
     },
     {
       "name": "titan-disembark",
       "category": "titan-enterxit",
       "description": "Player uses /disembark while in titan mode. Player ejected to side of titan as pilot with base health. Titan entity either despawns or remains as empty hull (design TBD). Child hitboxes despawned.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Disembark from titan. Player returns to pilot size/speed/health. No child hitbox entities remain."
     },
     {
       "name": "titan-destruction",
       "category": "titan-enterxit",
       "description": "When titan (parent player) health reaches 0 while in titan mode: force-eject pilot, destroy titan, pilot spawns with base pilot health. Kill credit to attacker. Titan cooldown timer starts.",
-      "status": "failing",
+      "status": "passing",
       "validation": "Kill a titan. Pilot ejected alive with base health. Attacker gets kill credit. Titan mode off."
     }
   ]

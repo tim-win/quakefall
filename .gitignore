@@ -23,3 +23,6 @@ maps/*.prt
 
 # Logs
 *.log
+tests/recordings/*.mp4
+tests/recordings/*.gif
+tests/recordings/*.log

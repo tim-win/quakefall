@@ -14,7 +14,37 @@ This project uses structured long-running agent sessions. **Read these before st
 
 ### Validation Is YOUR Job
 
-**You do not hand features back to the user for testing.** You implement, you build, you start the server, you test, you confirm it works, you screenshot if visual, and THEN you mark it passing. The validation steps in `features.json` are instructions for YOU to execute, not acceptance criteria for the user. If you can't validate a feature yourself (e.g., requires a second human player), document exactly what you tested and what remains, and leave it as `"failing"`.
+**You do not hand features back to the user for testing.** You implement, you build, you start the server, you test, you confirm it works, you record a visual test, and THEN you mark it passing. The validation steps in `features.json` are instructions for YOU to execute, not acceptance criteria for the user. If you can't validate a feature yourself (e.g., requires a second human player), document exactly what you tested and what remains, and leave it as `"failing"`.
+
+### Visual Test Recordings (Required for Validation)
+
+**Every feature with a visual component must ship with a recorded `.test` file and captured GIF as proof of validation.** Text-only RCON logs are not sufficient — if it can be seen, it must be captured.
+
+**How to validate a feature:**
+1. Write a `.test` file in `tests/` covering the feature's expected behavior
+2. Include BOTH first person AND third person views (use `VIEW first` / `VIEW third`)
+3. Run: `tools/visual_test.sh run tests/your_feature.test`
+4. Check the GIF in `tests/recordings/` — visually confirm correct behavior
+5. Only then flip the feature to `"passing"` in `features.json`
+
+**`.test` file format** — line-oriented directives:
+```
+NAME my_feature
+DESC What this test validates
+VIEW first                    # Switch to first person
+RCON forcecalltitan 0         # Server command via RCON
+WAIT 3                        # Sleep N seconds (let game state settle + capture frames)
+NOTE Description of expected state   # Logged with timestamp
+CVAR cg_titanDebug 1          # Client-side cvar (sent via console, not RCON)
+VIEW third                    # Switch to third person
+CONSOLE some_command          # Type into client console directly
+```
+
+**Key details:**
+- `RCON` sends commands to the server. `CVAR` and `VIEW` send to the client console via keystroke injection.
+- The script starts its own Xvfb, server (with `sv_cheats 1`), and client — fully self-contained.
+- Output: `tests/recordings/<name>.gif` (400px), `<name>.mp4` (800x600), `<name>.log`
+- Only skip third person for purely non-visual features (server-only logic with no client representation).
 
 ### Session Startup Checklist
 1. Read `claude-progress.txt` and recent `git log`
@@ -54,6 +84,7 @@ quakefall/
 │   ├── server.sh             ← server management (tools/server.sh start|stop|restart|status|log)
 │   ├── rcon.py               ← RCON client (python3 tools/rcon.py 'status')
 │   ├── compile_map.sh        ← map compile+deploy (tools/compile_map.sh maps/foo.map)
+│   ├── visual_test.sh        ← visual test runner (tools/visual_test.sh run tests/foo.test)
 │   └── generate_city_map.py  ← procedural city map generator
 ├── maps/
 │   └── qfcity1.map/bsp      ← first city map
@@ -91,6 +122,11 @@ python3 tools/rcon.py "titan_parts"       # Dump titan hitbox state (when implem
 
 # Map compilation
 tools/compile_map.sh maps/qfcity1.map    # BSP/VIS/LIGHT + deploy to both build dirs
+
+# Visual test recording (requires xvfb, ffmpeg, xdotool)
+tools/visual_test.sh run tests/titan_flow.test   # Record single test as GIF+MP4
+tools/visual_test.sh run-all                      # Record all tests
+tools/visual_test.sh list                          # List available tests
 
 # Environment overrides
 QF_MAP=testmap tools/server.sh start     # Start with different map
