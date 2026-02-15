@@ -3,7 +3,7 @@
 # See docs/anthropic-long-running-agents.md for workflow details.
 
 ## Last Updated
-2026-02-14 — Second agent session: titan hitbox system FULLY VALIDATED
+2026-02-14 — Third session: titan gameplay tuning, rendering/network bug fixes
 
 ## What's Done (Phase 1)
 
@@ -17,8 +17,7 @@
 
 ### Titan Mode Phase 1
 - /titan console command toggles titan mode
-- Single enlarged bounding box (±30 width, 80 height)
-- 500 HP, 0.6x speed, no jumping, viewheight 56
+- 500 HP, 1.1x speed, no jumping
 - PMF_TITAN flag shared between server and client prediction
 - Graceful animation number clamping (prevents BAD ANIMATION crashes)
 - MUST use vm_game 0 on server (q3lcc QVM compiler bug corrupts titan bytecode)
@@ -80,6 +79,34 @@ in the titan-hitbox category are now "passing" in features.json.
 
 ### Parent Repo Changes
 - tools/build.sh — also copies .so files to demoq3 (not just QVMs)
+- gamedata/scripts/quakefall.shader — custom 3D debug shader source
+
+## What's Done (Session 3) — Titan Gameplay Tuning & Bug Fixes
+
+Focused on making titans feel right to play and fixing rendering/network bugs
+that prevented the hitbox debug visualization from working in browser multiplayer.
+
+### Titan Scaling & Feel
+- Scaled titan ~1.73x total (two rounds: +33% then +30%)
+- Final dimensions: ±52 width, 346 height, 260 viewheight
+- Player model positioned at upper chest/vent height (RENDER_OFFSET 225)
+- Speed increased from 0.6x to 1.1x — titans now slightly faster than pilots
+
+### Bug Fixes
+- **Debug shader**: whiteShader is 2D-only, doesn't work with trap_R_AddPolyToScene.
+  Created titanDebug shader with rgbGen vertex + alphaGen vertex + blendFunc
+- **eFlags network truncation**: EF_TITAN (bit 20) was silently truncated —
+  entityState_t.eFlags was 19 bits, playerState_t.eFlags was 16 bits.
+  Widened both to 24 bits in msg.c. This caused the player model elevation
+  (TITAN_RENDER_OFFSET) to never reach clients.
+- **Stale QVM builds**: cmake doesn't track header deps for q3lcc. Changing
+  bg_public.h doesn't trigger QVM rebuild. Must delete qvm.dir/ manually.
+- **WASM shader delivery**: Added quakefall.shader to client-config.json so
+  browser client downloads it to the virtual filesystem
+- **Own-part filtering**: Skip rendering own titan debug boxes in first-person
+  (camera was inside them). Uses otherEntityNum for ownership identification.
+- **SVF_BROADCAST**: Titan part entities now broadcast to all clients regardless
+  of PVS, ensuring reliable hitbox visibility in multiplayer
 
 ## Next Steps
 
@@ -100,7 +127,7 @@ in the titan-hitbox category are now "passing" in features.json.
 - Client QVMs (cgame, ui) compile fine, only qagame.qvm is affected
 - Duplicate ioq3ded processes cause network corruption — always check before starting
 
-## Discoveries This Session
+## Discoveries (Cumulative)
 - q3lcc QVM compiler doesn't handle `extern const` properly — emits definitions in every translation unit
 - q3lcc is strict about const pointer conversions — can't pass `const vec3_t` where `vec3_t` is expected
 - CONTENTS_PLAYERCLIP is in MASK_PLAYERSOLID but NOT in MASK_SHOT — enables the collision strategy
@@ -108,3 +135,7 @@ in the titan-hitbox category are now "passing" in features.json.
 - `die` callback only fires at health<=0; use `pain` callback for per-hit damage routing
 - build.sh must copy .so files (not just QVMs) to demoq3/ or server loads stale game logic
 - Part count of 7 is conservative; engine can handle 15-30 per titan comfortably
+- whiteShader is 2D only — 3D scene polys need custom shader with rgbGen vertex
+- eFlags network fields silently truncate bits beyond their width — no error, just zeros
+- cmake does NOT track .h deps for QVM builds — must nuke qvm.dir/ when headers change
+- Loose files (shaders, BSPs) need explicit entries in client-config.json for WASM delivery
